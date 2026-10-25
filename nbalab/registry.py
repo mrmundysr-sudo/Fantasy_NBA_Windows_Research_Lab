@@ -81,7 +81,7 @@ def _count(id, name, desc, aliases=(), cat="traditional", better="higher", scope
 # ---- Traditional counting stats (observed) -------------------------------------------
 _add(Metric("gp", "Games Played", "traditional", "observed", "count", ALL_SCOPES,
             "Games with recorded minutes (player) or games played (team/coach/lineup).", None, True, ("raw",),
-            aliases=("games", "games played", "g")))
+            aliases=("games played", "gp")))
 _add(Metric("gs", "Games Started", "traditional", "observed", "count", (PLAYER,),
             "Games started.", None, True, ("raw",), aliases=("starts", "games started")))
 _add(Metric("min", "Minutes", "traditional", "observed", "minutes", ALL_SCOPES,

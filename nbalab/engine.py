@@ -15,7 +15,7 @@ Structured query (all keys optional unless noted)::
                   "rest_min": 2, "rest_max": 5, "min_minutes_game": 20, "ot": false,
                   "teammates_out": [12], "teammates_in": [14], "coach_ids": [2]},
       "ids": [..], "team_ids": [..], "position": "PG",
-      "min_games": 5, "min_minutes": 100,
+      "min_games": 5, "min_minutes": 100, "min_mpg": 12,
       "sort": {"by": "pts", "desc": true}, "limit": 25,
       "uncertainty": true
     }
@@ -142,6 +142,7 @@ class Engine:
             "position": q.get("position"),
             "min_games": int(q.get("min_games", 1)),
             "min_minutes": float(q.get("min_minutes", 0)),
+            "min_mpg": float(q.get("min_mpg", 0)),
             "sort": dict(q.get("sort") or {}),
             "limit": int(q.get("limit", 25)),
             "uncertainty": bool(q.get("uncertainty", True)),
@@ -372,6 +373,8 @@ class Engine:
         gp_total = sums["gp"]
         keep &= gp_total >= q["min_games"]
         keep &= sums["min"] >= q["min_minutes"]
+        if q["min_mpg"] > 0:
+            keep &= sums["min"] >= q["min_mpg"] * np.maximum(sums["gp"], 1)
         results: Dict[str, np.ndarray] = {}
         columns = []
         for m, tr, label in calc_specs:
