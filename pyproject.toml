@@ -1,0 +1,23 @@
+[project]
+name = "nbalab"
+version = "0.1.0"
+description = "Private Windows NBA statistical research and fantasy prediction workstation (research prototype)"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+desktop = ["pywebview>=5.0"]
+build = ["pyinstaller>=6.0"]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+nbalab = "nbalab.app:main"
+
+[tool.setuptools.packages.find]
+include = ["nbalab*"]
+
+[tool.setuptools.package-data]
+nbalab = ["ui/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

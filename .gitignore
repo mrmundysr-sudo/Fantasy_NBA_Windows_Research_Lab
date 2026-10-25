@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+# Local secrets and data. API keys must never be committed.
+.env
+*.key
+secrets.*
+nbalab_data/
+*.sqlite
+*.sqlite-journal
