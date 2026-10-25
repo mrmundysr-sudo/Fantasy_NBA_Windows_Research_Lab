@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS sources (name TEXT PRIMARY KEY, kind TEXT, enabled IN
     last_attempt_at TEXT, last_success_at TEXT, last_error TEXT, notes TEXT);
 CREATE TABLE IF NOT EXISTS predictions (pred_id INTEGER PRIMARY KEY AUTOINCREMENT, game_id INTEGER, player_id INTEGER,
     model_id TEXT, model_version TEXT, made_at TEXT, as_of TEXT, trigger_event_id INTEGER, snapshot_id INTEGER,
-    p_play REAL, min_mean REAL, min_p10 REAL, min_p50 REAL, min_p90 REAL, stats_json TEXT, data_label TEXT);
+    p_play REAL, min_mean REAL, min_p10 REAL, min_p50 REAL, min_p90 REAL, stats_json TEXT, draws BLOB, explain_json TEXT, data_label TEXT);
 CREATE TABLE IF NOT EXISTS snapshots (snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT, game_id INTEGER, player_id INTEGER,
     made_at TEXT, as_of TEXT, features_json TEXT, source_times_json TEXT);
 CREATE TABLE IF NOT EXISTS scoring_systems (scoring_id TEXT, version INTEGER, name TEXT, rules_json TEXT, created_at TEXT,
