@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NBA Research Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="lab-token" content="__LAB_TOKEN__">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="top">
+  <span class="brand">NBA Research Lab</span>
+  <span id="synth" class="badge b-synth" style="display:none" title="All bundled data is a fictional fixture">SYNTHETIC DATA</span>
+  <input id="gsearch" placeholder="Search players, teams, coaches, metrics...  (Ctrl+K)" autocomplete="off">
+  <div id="sresults"></div>
+  <span class="grow"></span>
+  <span id="launchers"></span>
+  <button id="tile" title="Tile open panels">Tile</button>
+  <button id="cascade" title="Cascade open panels">Cascade</button>
+  <button id="wsave" title="Save this window layout as a named workspace">Save layout</button>
+  <select id="wload" title="Load a saved workspace layout"><option value="">Workspaces...</option></select>
+</div>
+<div id="desk"></div>
+<div id="status"><span id="st-data"></span><span id="st-clock"></span><span id="st-champ"></span><span id="st-msg"></span></div>
+<script src="/app.js"></script>
+<script src="/panels_a.js"></script>
+<script src="/panels_b.js"></script>
+<script src="/boot.js"></script>
+</body>
+</html>
