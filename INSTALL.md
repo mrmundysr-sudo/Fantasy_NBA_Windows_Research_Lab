@@ -3,6 +3,8 @@
 **Status: research prototype. All bundled data is SYNTHETIC (fictional teams and players). Nothing here is a real NBA pick.**
 
 ## Option A: portable build from CI (no Python needed)
+*Currently blocked: the CI artifact upload hit a GitHub artifact-storage quota (see `STATUS.md`). Re-run the workflow after the quota resets or after clearing old artifacts, or use Option B.*
+
 1. In GitHub, open **Actions → windows-build →** latest run on `dev/windows-research-lab`.
 2. Download the artifact **NBALab-windows-portable** (private repo; you must be signed in).
 3. Unzip and run `NBALab\NBALab.exe`. Windows SmartScreen may warn because the build is unsigned: *More info → Run anyway*.

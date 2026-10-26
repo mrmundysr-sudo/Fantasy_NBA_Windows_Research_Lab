@@ -38,7 +38,9 @@ A working, launchable, offline-first Windows research workstation exists: a Pyth
 - **Merge to `main` and any publication**: requires owner approval; not done.
 
 ## Windows verification
-See the section appended below by the CI check (filled in after the GitHub Actions `windows-latest` run completes). A Linux pass is not treated as proof of the Windows build.
+Verified on a GitHub Actions `windows-latest` runner (run 40247859624, commit c737f1f, branch `dev/windows-research-lab`). Passed there: the full test suite (pytest), the headless-Chromium UI smoke test, the PyInstaller build, and `NBALab.exe --selftest` on the packaged app (serves the UI, token check, workbench query, picks projection). Earlier runs failed on two real packaging bugs (relative-import entry point; UI data folder shadowing the package), both fixed.
+**Not verified:** nobody has yet launched the desktop window (pywebview/WebView2) on a real Windows desktop, so the visible window, SmartScreen behaviour and layout on real displays are untested. CI only exercises the headless server/browser path.
+**Blocked:** the final step, uploading the portable zip as a workflow artifact, fails with *"Artifact storage quota has been hit"* (GitHub account-level; usage recalculates every 6-12 hours or can be cleared in repo/account settings). The step is now non-blocking so it cannot hide test or build results. Until it succeeds, build from source (see `INSTALL.md`).
 
 ## Environment notes
 - PyPI was unreachable from the development sandbox (HTTP 403), so the build uses only numpy and the standard library; `pytest`, `pywebview` and `PyInstaller` were not installable there and are installed by CI.
