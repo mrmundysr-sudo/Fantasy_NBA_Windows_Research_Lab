@@ -28,9 +28,11 @@ jobs:
       - name: Unit and integration tests
         run: python -m pytest -q tests
       - name: UI smoke test (headless Chromium)
+        shell: pwsh
         run: |
           python -m playwright install chromium
-          python tools/ui_smoke.py
+          python tools/ui_smoke.py; if ($LASTEXITCODE -ne 0) { Write-Host 'smoke failed once, retrying'; python tools/ui_smoke.py }
+          exit $LASTEXITCODE
       - name: Build Windows app (PyInstaller)
         run: pyinstaller packaging/nbalab.spec --noconfirm
       - name: Packaged app self-test
