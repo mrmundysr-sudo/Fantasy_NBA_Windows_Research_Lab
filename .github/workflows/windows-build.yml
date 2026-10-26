@@ -114,11 +114,17 @@ jobs:
       - name: Packaged exe self-test (no network)
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath .\dist\NBA-Source-Diagnostics.exe -ArgumentList "--selftest","--selftest-out","$env:RUNNER_TEMP\diag-selftest.txt" -Wait -PassThru
-          $txt = Get-Content "$env:RUNNER_TEMP\diag-selftest.txt" -Raw
+          $out = Join-Path $env:RUNNER_TEMP "diag-selftest.txt"
+          $p = Start-Process -FilePath (Resolve-Path .\dist\NBA-Source-Diagnostics.exe).Path -ArgumentList "--selftest","--selftest-out",$out -Wait -PassThru
+          $code = $p.ExitCode
+          $exists = Test-Path $out
+          $txt = if ($exists) { Get-Content $out -Raw } else { "(no output file written)" }
+          Write-Host "exit=$code file=$exists"
           Write-Host $txt
-          if ($p.ExitCode -ne 0 -or $txt -notmatch "SELFTEST OK") { Write-Host "::error title=diagnostics exe selftest::$($txt -replace "`r","" -replace "`n","%0A")"; exit 1 }
-          Write-Host "::notice title=diagnostics exe selftest::$($txt -replace "`r","" -replace "`n","%0A")"
+          $msg = "exit=$code file=$exists " + ($txt -replace "`r","" -replace "%","%25" -replace "`n","%0A")
+          if ($msg.Length -gt 3000) { $msg = $msg.Substring(0, 3000) }
+          if ($code -ne 0 -or $txt -notmatch "SELFTEST OK") { Write-Host "::error title=diagnostics exe selftest::$msg"; exit 1 }
+          Write-Host "::notice title=diagnostics exe selftest::$msg"
       - name: Publish to private release
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: pwsh
