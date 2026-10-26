@@ -4,7 +4,7 @@ from PyInstaller.utils.hooks import collect_submodules
 hidden = collect_submodules("nbalab") + collect_submodules("webview")
 
 a = Analysis(
-    ["../nbalab/__main__.py"],
+    ["launch.py"],
     pathex=[".."],
     datas=[("../nbalab/ui", "nbalab/ui")],
     hiddenimports=hidden,
