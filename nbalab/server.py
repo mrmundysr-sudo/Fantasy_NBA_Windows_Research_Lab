@@ -33,9 +33,10 @@ from .store import utcnow
 def ui_dir() -> str:
     base = getattr(sys, "_MEIPASS", None)
     if base:
-        p = os.path.join(base, "nbalab", "ui")
-        if os.path.isdir(p):
-            return p
+        for sub in ("ui_data", os.path.join("nbalab", "ui")):
+            p = os.path.join(base, sub)
+            if os.path.isdir(p):
+                return p
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 
 
