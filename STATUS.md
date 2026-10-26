@@ -37,6 +37,15 @@ A working, launchable, offline-first Windows research workstation exists: a Pyth
 - **Code signing** certificate if the app is ever distributed beyond the owner.
 - **Merge to `main` and any publication**: requires owner approval; not done.
 
+## Data providers (2026-10-25 update, priority: NBA.com/stats + nba_api first)
+
+* Capability-based source layer with interchangeable adapters: `NBA_STATS`, `NBA_LIVE`, `NBA_INJURY_REPORT` (official PDF, new), `BALLDONTLIE`, `SPORTSDATAIO`. All disabled until you type the terms acknowledgement; keys come from environment variables; nothing purchased.
+* **Live evidence so far (Windows cloud runner):** cdn.nba.com live scoreboard, box score and starters worked (7 games, 29 and 10 rows). stats.nba.com timed out on all 9 probes, as nba_api warns for cloud IPs. Run the probe on your own machine: `python tools/probe_sources.py --acknowledge-terms --sources NBA_STATS NBA_LIVE NBA_INJURY_REPORT` (or the Sources panel).
+* Not verified live: stats.nba.com payloads, the injury-report PDF layout (needs `pip install pypdf`), BALLDONTLIE and SportsDataIO (no keys).
+* Not yet built: confirmed starters as a minutes feature, per-game starter backfill, `id_map` use, scheduled refresh.
+* One Windows UI-smoke failure occurred on a manual re-run of a commit whose push run passed (flaky); local smoke passes. Watch for recurrence.
+* See `docs/DATA_PROVIDER_EVALUATION.md` and `docs/LICENSING_AND_COMMERCIAL_CONCERNS.md`. The NBA.com terms question (Section 9) is an open owner decision.
+
 ## Windows verification
 Verified on a GitHub Actions `windows-latest` runner (run 40247859624, commit c737f1f, branch `dev/windows-research-lab`). Passed there: the full test suite (pytest), the headless-Chromium UI smoke test, the PyInstaller build, and `NBALab.exe --selftest` on the packaged app (serves the UI, token check, workbench query, picks projection). Earlier runs failed on two real packaging bugs (relative-import entry point; UI data folder shadowing the package), both fixed.
 **Not verified:** nobody has yet launched the desktop window (pywebview/WebView2) on a real Windows desktop, so the visible window, SmartScreen behaviour and layout on real displays are untested. CI only exercises the headless server/browser path.

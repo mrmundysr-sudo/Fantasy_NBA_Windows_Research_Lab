@@ -10,3 +10,6 @@ python -m nbalab            # desktop window (needs pywebview + WebView2) or bro
 python -m unittest discover -s tests
 ```
 Layout: `nbalab/` engine, models, providers, server and `ui/`; `tests/`; `tools/ui_smoke.py`; `packaging/` (PyInstaller spec, Inno Setup); `.github/workflows/windows-build.yml`.
+
+
+Data-provider evaluation and licensing notes: `docs/DATA_PROVIDER_EVALUATION.md`, `docs/LICENSING_AND_COMMERCIAL_CONCERNS.md`.

@@ -28,3 +28,10 @@ Opening takes a few seconds while the synthetic fixture is generated, models are
 
 ## Secrets
 No API keys are required or included. If provider adapters are enabled later, keys come from environment variables and must never be committed (`.gitignore` already excludes `.env`, `*.key`, `secrets.*`, `*.sqlite`).
+
+## Real data (optional, your own machine)
+
+1. Open the Sources panel, read each provider's terms link, and enable only what you accept.
+2. Probe: `python tools/probe_sources.py --acknowledge-terms --sources NBA_STATS NBA_LIVE NBA_INJURY_REPORT`.
+3. The injury report needs `pip install pypdf`. Keyed sources use the `BALLDONTLIE_API_KEY` / `SPORTSDATAIO_API_KEY` environment variables.
+4. Real imports go to a separate database labelled `NBA_STATS_IMPORT`; the synthetic fixture is never mixed in.

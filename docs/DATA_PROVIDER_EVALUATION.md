@@ -19,6 +19,19 @@ A failed probe never upgrades evidence. Licensing and commercial-release concern
   or use the **Sources** panel (enable, then Probe). Results land in `source_probe` and feed the capability matrix.
 * GitHub Actions `provider-probe` job (Windows cloud runner). nba_api's README warns stats.nba.com ignores many cloud IP ranges, so a timeout there is expected and is **not** evidence the endpoints are down.
 
+## 1b. First real probe results (GitHub Actions windows-latest, 2026-10-25, run 40250448191, commit 4c6f80c)
+
+Cloud runner, no keys, 3 of 13 probes ok:
+
+| Source / capability | Result |
+|---|---|
+| `NBA_LIVE` live_scoreboard | **ok**, 7 games |
+| `NBA_LIVE` live_box_score | **ok**, 29 rows |
+| `NBA_LIVE` starting_lineups | **ok**, 10 rows (starter flags from the live box) |
+| `NBA_STATS` (schedule, players, game logs, advanced, team logs, lineups, shot locations) | **timeout after 30 s**, all 9; box_score skipped because the schedule probe gave no game id |
+
+Reading: cdn.nba.com live data is reachable from a cloud IP. stats.nba.com did not answer from this runner, which matches nba_api's warning about cloud IP ranges. This is **not** evidence that the stats endpoints are broken; it is evidence that they cannot be relied on from cloud hosts. The same probe must be run from your own machine before the stats side is judged. (Only row counts were recorded; sample payloads were not saved, so field-level parsing against real live data is still unverified.)
+
 ## 2. Priority 1: NBA.com/stats via nba_api
 
 nba_api is MIT-licensed, v1.12.0. The application does not depend on the library at runtime; it uses the library's catalogue (endpoint names, parameters, result-set headers) and its own rate-limited HTTP transport with browser-style headers.
