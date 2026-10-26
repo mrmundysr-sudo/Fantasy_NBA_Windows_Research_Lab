@@ -27,8 +27,12 @@ Vendor FAQ (fetched 2026-10-25): commercial licences allow storing responses and
 
 Sportradar, MySportsFeeds, API-NBA, ESPN unofficial endpoints, Basketball-Reference: not reviewed.
 
+## Owner decision recorded (2026-10-25, 20:49 ET)
+
+On the NBA.com Section 9 question, the owner replied: "Ok for this private research." This is the owner's own determination for **private research use only**; it is not legal advice and not a licence. It does **not** cover any public release, distribution, commercial use or redistribution of NBA-sourced data, which stay open (items 2 and 3 below). The in-app gate is unchanged: the owner still types the acknowledgement sentence to enable each source.
+
 ## Decisions needed from the owner
 
-1. Is private research use of NBA.com statistics acceptable under your reading of Section 9?
+1. ~~Is private research use of NBA.com statistics acceptable?~~ Answered by the owner: yes, for private research (see above).
 2. If a public release is ever planned, which licensed source replaces NBA-sourced data?
 3. Approval (or not) to buy any keyed feed. None will be purchased without it.
