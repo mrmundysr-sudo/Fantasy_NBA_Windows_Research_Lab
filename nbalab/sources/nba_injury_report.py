@@ -167,6 +167,10 @@ class NbaInjuryReportSource(DataSource):
         if data is None:
             raise last_err or SourceError("unreachable", "no report found")
         pub = published_from_filename(used)
-        recs = parse_report_text(pdf_to_text(data.body), pub)
+        text = pdf_to_text(data.body)
+        recs = parse_report_text(text, pub)
+        if not recs:
+            head = " | ".join(l.strip() for l in text.splitlines()[:12] if l.strip())[:600]
+            raise SourceError("parse", f"downloaded {used} ({len(data.body)} bytes) but parsed 0 rows; first text lines: {head}")
         return Fetched(cap, self.name, recs, {"url": data.url, "status": data.status, "elapsed_ms": round(data.elapsed_ms), "rows": len(recs), "file": used, "published_at": pub, "slots_tried": tried,
                                               "retrieved_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}, sample=recs[:3])

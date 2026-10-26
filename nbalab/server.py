@@ -221,6 +221,8 @@ class App:
     def route(self, method: str, path: str, qs, body: dict):
         lab = self.lab
         g = lambda k, d=None: (qs.get(k) or [d])[0]
+        if path.startswith("/api/diagnostics/") and method in ("GET", "POST"):
+            return lab.diagnostics.handle(method, path[len("/api/diagnostics/"):], body)
         if method == "GET":
             if path == "/api/status":
                 return 200, lab.status()

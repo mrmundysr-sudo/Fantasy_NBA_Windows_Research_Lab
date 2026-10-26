@@ -85,3 +85,50 @@ jobs:
           path: |
             probe_report.json
             probe_samples
+
+  diagnostics-exe:
+    # Builds NBA-Source-Diagnostics.exe (one file, no installer, no admin) and attaches it to a PRIVATE GitHub release
+    # (the repository is private, so only people with repository access can download it).
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pypdf playwright pytest numpy
+      - name: Diagnostics tests and page test
+        shell: pwsh
+        run: |
+          python -m pytest -q tests/test_diagnostics.py
+          python -m playwright install chromium
+          python tools/diag_ui_smoke.py
+      - name: Build NBA-Source-Diagnostics.exe
+        run: pyinstaller packaging/diag.spec --noconfirm
+      - name: Packaged exe self-test (no network)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath .\dist\NBA-Source-Diagnostics.exe -ArgumentList "--selftest","--selftest-out","$env:RUNNER_TEMP\diag-selftest.txt" -Wait -PassThru
+          $txt = Get-Content "$env:RUNNER_TEMP\diag-selftest.txt" -Raw
+          Write-Host $txt
+          if ($p.ExitCode -ne 0 -or $txt -notmatch "SELFTEST OK") { Write-Host "::error title=diagnostics exe selftest::$($txt -replace "`r","" -replace "`n","%0A")"; exit 1 }
+          Write-Host "::notice title=diagnostics exe selftest::$($txt -replace "`r","" -replace "`n","%0A")"
+      - name: Publish to private release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "diagnostics-latest"
+          $size = [math]::Round((Get-Item dist\NBA-Source-Diagnostics.exe).Length / 1MB, 1)
+          $notes = "NBA Source Diagnostics ($size MB). Built from commit $env:GITHUB_SHA on $(Get-Date -Format u). Download NBA-Source-Diagnostics.exe, double-click, confirm terms, press Run Tests, then Export Report. Windows may show a SmartScreen notice because the file is not code-signed: choose More info, then Run anyway."
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) { gh release create $tag --prerelease --target $env:GITHUB_SHA --title "NBA Source Diagnostics (latest dev build)" --notes $notes } else { gh release edit $tag --notes $notes }
+          gh release upload $tag dist\NBA-Source-Diagnostics.exe --clobber
+          Write-Host "::notice title=release::https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"

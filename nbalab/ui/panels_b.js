@@ -219,3 +219,32 @@ registerPanel("sources", "Data Sources & Providers", (body) => {
   load().catch((e) => host.append(el("div", {class: "banner bad"}, e.message)));
   return {close: () => clearInterval(timer), reload: () => load()};
 }, {x: 60, y: 30, w: 1040, h: 620});
+
+
+/* ---------- Data Source Diagnostics: test provider connections from THIS computer, with progress and an exportable report ---------- */
+registerPanel("diag", "Data Source Diagnostics", (body) => {
+  const host = el("div"); body.append(host); let timer = null, st = null;
+  const CHIP = {ok: "b-pass", empty: "b-pass", timeout: "b-warn", blocked: "b-fail", unreachable: "b-fail", http: "b-fail", auth: "b-fail", parse: "b-fail", not_configured: "b-warn", skipped: "b-info", pending: "b-info", running: "b-info"};
+  async function init() {
+    st = await api("/api/diagnostics/state"); clear(host);
+    host.append(el("div", {class: "banner small"}, "Tests which data sources answer from this computer. Makes a few small, spaced-out requests per source. Each source has its own terms: read the link, then confirm. Use it for any future provider added to the Sources layer."));
+    const rows = st.sources.map((s) => { const inc = el("input", {type: "checkbox", checked: s.default}), ack = el("input", {type: "checkbox"}); return {s, inc, ack}; });
+    rows.forEach((r) => host.append(el("div", {class: "banner"}, el("label", {class: "row"}, r.inc, el("b", null, r.s.name), el("span", {class: "small muted"}, r.s.kind)),
+      el("div", {class: "small"}, r.s.terms_summary || "No terms summary recorded."), el("div", {class: "small muted"}, "Terms: " + r.s.terms_url),
+      el("label", {class: "row small"}, r.ack, "I have read the terms for " + r.s.name + " and accept responsibility for how I use this source."))));
+    const out = el("div"), msg = el("span", {class: "small muted"});
+    const run = el("button", {class: "primary", onclick: async () => { const pick = rows.filter((r) => r.inc.checked).map((r) => r.s.name), ak = rows.filter((r) => r.ack.checked).map((r) => r.s.name);
+      try { await api("/api/diagnostics/start", {body: {sources: pick, acknowledged: ak}}); msg.textContent = ""; poll(out); } catch (e) { msg.textContent = e.message; } }}, "Run Tests");
+    host.append(el("div", {class: "row"}, run, msg), out); if (st.progress.status !== "idle") poll(out);
+  }
+  function poll(out) { clearInterval(timer); const tick = async () => { const p = await api("/api/diagnostics/progress"); draw(out, p); if (p.status === "done") clearInterval(timer); }; tick(); timer = setInterval(() => tick().catch(() => {}), 800); }
+  function draw(out, p) {
+    clear(out); out.append(el("div", {class: "small"}, p.status === "running" ? el("span", {class: "spin"}) : "", ` ${p.done} of ${p.total} checks finished`));
+    out.append(dataTable([{key: "source", label: "Source"}, {key: "capability", label: "Check"}, {key: "label", label: "Result", render: (r) => badge(r.label, CHIP[r.state] || "b-fail")}, {key: "rows", label: "Rows", num: true}, {key: "elapsed_ms", label: "ms", num: true}, {key: "detail", label: "Detail"}], p.steps, {sortKey: null, pageSize: 60}));
+    if (p.status === "done") { const where = el("div", {class: "small mono"}, p.last_export ? "Saved: " + p.last_export : "");
+      out.append(el("div", {class: "row"}, el("button", {class: "primary", onclick: async () => { try { const r = await api("/api/diagnostics/export", {body: {}}); where.textContent = "Saved: " + r.path; toast("Report saved", true); } catch (e) { toast(e.message); } }}, "Export Report"),
+        el("button", {onclick: () => api("/api/diagnostics/reveal", {body: {}}).catch((e) => toast(e.message))}, "Show in folder")), where); }
+  }
+  init().catch((e) => host.append(el("div", {class: "banner warn"}, e.message)));
+  return {destroy: () => clearInterval(timer)};
+}, {x: 120, y: 60, w: 820, h: 560});

@@ -61,6 +61,8 @@ class Lab:
         self.csv_provider = CsvEventProvider(None)
         self.events.register(self.csv_provider)
         self.sources = SourceRouter(s)
+        from .diagnostics import DiagnosticsRunner
+        self.diagnostics = DiagnosticsRunner(self.sources, "NBA Research Lab")
         for src, cap in (("NBA_LIVE", "injuries"), ("NBA_LIVE", "starting_lineups"), ("SPORTSDATAIO", "injuries"), ("SPORTSDATAIO", "starting_lineups"),
                          ("NBA_INJURY_REPORT", "injuries"), ("BALLDONTLIE", "injuries"), ("BALLDONTLIE", "starting_lineups")):
             self.events.register(SourceEventAdapter(self.sources, src, cap))

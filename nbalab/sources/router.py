@@ -153,20 +153,29 @@ class SourceRouter:
         return out
 
     # ---- probing --------------------------------------------------------------------------------
-    def probe(self, names: Optional[List[str]] = None, save_dir: Optional[str] = None) -> List[dict]:
+    def probe(self, names: Optional[List[str]] = None, save_dir: Optional[str] = None, progress=None) -> List[dict]:
         """Run a small fixed set of live requests per ENABLED source and record outcomes. Honest by construction: every outcome
         (ok / empty / blocked / timeout / unreachable / auth / http / parse) is stored with timestamp and environment."""
         env = json.dumps({"platform": platform.platform(), "python": platform.python_version()})
         season = current_season()
         results = []
 
+        fails: Dict[str, int] = {}
+        note = progress or (lambda ev: None)
+
         def rec(source, cap, outcome, rows=0, ms=0.0, url="", detail="", sample=None):
             self.store.execute("INSERT INTO source_probe (at, source, capability, outcome, rows, elapsed_ms, url, detail, sample_json, env) VALUES (?,?,?,?,?,?,?,?,?,?)",
                                (_now(), source, cap, outcome, rows, ms, url, detail[:400], json.dumps(sample, default=str)[:4000] if sample is not None else None, env))
-            results.append({"source": source, "capability": cap, "outcome": outcome, "rows": rows, "elapsed_ms": ms, "detail": detail[:200]})
+            res = {"source": source, "capability": cap, "outcome": outcome, "rows": rows, "elapsed_ms": ms, "detail": detail[:200]}
+            results.append(res)
+            note({"phase": "done", **res, "url": url, "sample_text": json.dumps(sample, default=str)[:3000] if sample is not None else None})
 
         def run(name, cap, **params):
             s = self.sources[name]
+            if fails.get(name, 0) >= 2:      # two timeouts in a row: stop hammering a host that is not answering
+                rec(name, cap, "skipped", detail="skipped: the previous two requests to this source timed out")
+                return None
+            note({"phase": "start", "source": name, "capability": cap})
             try:
                 f = self.fetch_from(name, cap, **params)
                 if save_dir and f.sample is not None:
@@ -174,9 +183,11 @@ class SourceRouter:
                     os.makedirs(save_dir, exist_ok=True)
                     with open(os.path.join(save_dir, f"{name}_{cap}.json"), "w", encoding="utf-8") as fh:
                         json.dump({"meta": f.meta, "sample": f.sample}, fh, default=str, indent=1)
+                fails[name] = 0
                 rec(name, cap, "ok" if f.records else "empty", len(f.records), f.meta.get("elapsed_ms", 0), f.meta.get("url", ""), "", f.sample)
                 return f
             except SourceError as e:
+                fails[name] = fails.get(name, 0) + 1 if e.kind == "timeout" else 0
                 rec(name, cap, e.kind, 0, 0, "", e.detail)
                 return None
 
@@ -223,3 +234,13 @@ class SourceRouter:
                 run(name, "starting_lineups", date=_now()[:10])
                 run(name, "schedule", season=int(season[:4]) + 1)
         return results
+
+
+PROBE_PLAN: Dict[str, List[str]] = {
+    "NBA_STATS": ["schedule", "players_index", "player_game_logs", "player_game_logs_advanced", "team_game_logs", "player_season_advanced",
+                  "team_season_advanced", "lineup_combinations", "shot_locations", "box_score"],
+    "NBA_LIVE": ["live_scoreboard", "live_box_score", "starting_lineups"],
+    "NBA_INJURY_REPORT": ["injuries"],
+    "BALLDONTLIE": ["players_index", "schedule", "injuries"],
+    "SPORTSDATAIO": ["injuries", "starting_lineups", "schedule"],
+}

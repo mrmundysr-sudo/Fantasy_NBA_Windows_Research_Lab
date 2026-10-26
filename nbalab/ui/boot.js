@@ -1,7 +1,7 @@
 /* Boot: status bar, launchers, global search, layouts */
 "use strict";
 (async function boot() {
-  const names = [["picks", "Picks"], ["workbench", "Workbench"], ["research", "Ask"], ["explorer", "Explorer"], ["monitor", "Monitor"], ["models", "Models"], ["sources", "Sources"], ["audit", "Audit"], ["predlab", "Pred Lab"]];
+  const names = [["picks", "Picks"], ["workbench", "Workbench"], ["research", "Ask"], ["explorer", "Explorer"], ["monitor", "Monitor"], ["models", "Models"], ["sources", "Sources"], ["diag", "Diagnostics"], ["audit", "Audit"], ["predlab", "Pred Lab"]];
   const L = $("#launchers"); names.forEach(([id, t]) => L.append(el("button", {"data-id": id, title: LAB.builders[id].title, onclick: () => LAB.panels[id] ? closePanel(id) : openPanel(id)}, t)));
   $("#tile").onclick = tile; $("#cascade").onclick = cascade;
   async function refresh() {
