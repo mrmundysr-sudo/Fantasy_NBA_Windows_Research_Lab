@@ -89,7 +89,9 @@ class SourceEventAdapter(ProviderAdapter):
     def to_events(self, records: List[dict], retrieved_at: str, game_hint=None) -> List[RawEvent]:
         out = []
         for r in records:
-            pub = _iso_z(r.get("updated_at"))
+            if not r.get("player_name") and r.get("source") == "NBA_INJURY_REPORT":
+                continue                      # 'NOT YET SUBMITTED' team rows carry no player
+            pub = _iso_z(r.get("updated_at") or r.get("published_at"))
             label = "LIVE_SOURCE_TIME" if pub else "LIVE_RETRIEVED_TIME"
             pub = pub or retrieved_at
             if self.cap == "injuries" and self.source != "NBA_LIVE":

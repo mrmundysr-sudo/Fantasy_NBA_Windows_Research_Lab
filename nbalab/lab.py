@@ -62,9 +62,8 @@ class Lab:
         self.events.register(self.csv_provider)
         self.sources = SourceRouter(s)
         for src, cap in (("NBA_LIVE", "injuries"), ("NBA_LIVE", "starting_lineups"), ("SPORTSDATAIO", "injuries"), ("SPORTSDATAIO", "starting_lineups"),
-                         ("BALLDONTLIE", "injuries"), ("BALLDONTLIE", "starting_lineups")):
+                         ("NBA_INJURY_REPORT", "injuries"), ("BALLDONTLIE", "injuries"), ("BALLDONTLIE", "starting_lineups")):
             self.events.register(SourceEventAdapter(self.sources, src, cap))
-        self.events.register(HttpJsonProvider("NBA_OFFICIAL_INJURY_REPORT"))   # placeholder: the official report is a PDF; no parser yet
         self.events.register(HttpJsonProvider("SPORTRADAR"))
         self.engine.projections = self.projector.projections_for_engine(self.scoring.get("classic_points")["rules"])
         self.trained_through: Optional[str] = None

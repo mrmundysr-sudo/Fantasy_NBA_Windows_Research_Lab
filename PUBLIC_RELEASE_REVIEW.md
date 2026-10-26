@@ -24,3 +24,14 @@ Add entries as concrete issues arise. Distinguish verified restrictions from unr
 | 2026-10-25 | Microsoft WebView2 runtime (used by pywebview on Windows) | Desktop window | Runtime redistribution/installation terms not reviewed. App falls back to the default browser if absent | none yet | Review Microsoft WebView2 distribution terms; document runtime requirement | Pending |
 | 2026-10-25 | Unsigned Windows executable | Private use on the owner's machine | Unsigned PyInstaller builds commonly trigger SmartScreen/antivirus warnings; installers need a code-signing certificate for public distribution (a cost needing owner approval) | n/a | Obtain code signing only with owner approval | Open |
 | 2026-10-25 | Local API server | Loopback-only, per-launch token, Host-header check, strict CSP | Security review is internal only; no external penetration test | `tests/test_server_data.py` | Independent security review before release | Open |
+
+## Entries from the provider-priority phase (2026-10-25)
+
+See `docs/LICENSING_AND_COMMERCIAL_CONCERNS.md` for detail.
+
+| Date | Feature / provider | Private research capability | Known restriction or uncertainty | Evidence / terms link | Potential public-release action | Status |
+|---|---|---|---|---|---|---|
+| 2026-10-25 | NBA.com/stats via nba_api (`NBA_STATS`, `NBA_LIVE`) | Deep stats, minutes history, lineups, shot locations, live starters | ToU Section 9 page text restricts statistics for fantasy games, commercial products and comprehensive databases without consent, and describes private non-commercial use; **applicability to this lab unresolved**. Unofficial endpoints, cloud IPs often ignored | https://www.nba.com/termsofuse | License or replace before any distribution; ship no NBA data | Open: owner decision |
+| 2026-10-25 | Official NBA injury report PDF (`NBA_INJURY_REPORT`) | Free, timestamped injury status | Terms not separately reviewed; PDF layout parsed from one sample | https://official.nba.com/nba-injury-report-2026-27/ | Review terms | Pending |
+| 2026-10-25 | BALLDONTLIE adapter | Injuries (ALL-STAR), lineups/odds (GOAT) | Terms not read; no key; nothing purchased | https://www.balldontlie.io/terms | Read terms before use | Pending |
+| 2026-10-25 | SportsDataIO adapter | Injuries, lineups, projections | FAQ: commercial licences allow storage/modelling, no resale, attribution; personal plans non-commercial; priced by quote; nothing purchased | https://sportsdata.io/help/data-rights-and-licensing-questions | Negotiate a commercial licence | Pending |

@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 
 from .base import CAPABILITIES, DataSource, Fetched, SourceError
 from .balldontlie import BallDontLieSource
+from .nba_injury_report import NbaInjuryReportSource
 from .nba_stats import NbaLiveSource, NbaStatsSource
 from .sportsdataio import SportsDataIOSource
 
@@ -32,7 +33,7 @@ DEFAULT_PRIORITY: Dict[str, List[str]] = {
     "play_by_play": ["NBA_STATS", "SPORTSDATAIO", "BALLDONTLIE"],
     "live_scoreboard": ["NBA_LIVE"],
     "live_box_score": ["NBA_LIVE"],
-    "injuries": ["SPORTSDATAIO", "BALLDONTLIE", "NBA_LIVE"],
+    "injuries": ["NBA_INJURY_REPORT", "SPORTSDATAIO", "BALLDONTLIE", "NBA_LIVE"],
     "starting_lineups": ["SPORTSDATAIO", "NBA_LIVE", "BALLDONTLIE"],
     "odds": ["BALLDONTLIE"],
     "projections": ["SPORTSDATAIO"],
@@ -54,7 +55,7 @@ class SourceRouter:
     def __init__(self, store, transport=None, sources: Optional[List[DataSource]] = None):
         self.store = store
         self.sources: Dict[str, DataSource] = {}
-        for s in sources or [NbaStatsSource(transport), NbaLiveSource(transport), BallDontLieSource(transport), SportsDataIOSource(transport)]:
+        for s in sources or [NbaStatsSource(transport), NbaLiveSource(transport), BallDontLieSource(transport), SportsDataIOSource(transport), NbaInjuryReportSource(transport)]:
             self.sources[s.name] = s
         self.priority = {k: list(v) for k, v in DEFAULT_PRIORITY.items()}
         saved = store.get_meta("source_priority")
@@ -211,6 +212,8 @@ class SourceRouter:
                     run(name, "starting_lineups", game_id=g)
                 else:
                     rec(name, "live_box_score", "skipped", detail="no game on today's scoreboard")
+            elif name == "NBA_INJURY_REPORT":
+                run(name, "injuries")
             elif name == "BALLDONTLIE":
                 run(name, "players_index", per_page=5)
                 run(name, "schedule", per_page=5, **{"seasons[]": int(season[:4])})

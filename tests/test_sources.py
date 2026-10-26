@@ -265,3 +265,40 @@ class Importer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InjuryReport(unittest.TestCase):
+    """Shape fixture only: invented names laid out like the one sample report seen in public search results (not a recording)."""
+    TEXT = """Injury Report: 04/27/26 08:00 PM Page 1 of 1
+Game Date Game Time Matchup Team Player Name Current Status Reason
+04/27/2026 08:00 (ET) ATL@BOS Atlanta Hawks Test, Alice Available Injury/Illness - Left Hip; Soreness
+Roe, Bob Out Injury/Illness - Left Knee;
+Sprain
+Boston Celtics Poe, Carl Probable Injury Management
+Chicago Bulls NOT YET SUBMITTED
+"""
+
+    def test_parse_and_flip_names_and_wrapped_reason(self):
+        from nbalab.sources.nba_injury_report import parse_report_text
+        rows = parse_report_text(self.TEXT)
+        names = [(r["player_name"], r["status"]) for r in rows]
+        self.assertEqual(names[:3], [("Alice Test", "available"), ("Bob Roe", "out"), ("Carl Poe", "probable")])
+        self.assertIn("Sprain", rows[1]["reason"])
+        self.assertEqual(rows[3]["status"], "not_submitted")
+        self.assertEqual(rows[0]["published_at"], "2026-04-28T00:00:00Z")     # 8 PM EDT -> 00:00 UTC next day
+
+    def test_filename_time_and_dst(self):
+        from nbalab.sources.nba_injury_report import published_from_filename
+        self.assertEqual(published_from_filename("Injury-Report_2026-01-27_01_15PM.pdf"), "2026-01-27T18:15:00Z")   # EST
+        self.assertEqual(published_from_filename("Injury-Report_2026-10-25_11_30AM.pdf"), "2026-10-25T15:30:00Z")   # EDT
+
+    def test_slot_names_are_newest_first_on_15_min_grid(self):
+        from datetime import datetime, timezone
+        from nbalab.sources.nba_injury_report import slot_names
+        s = slot_names(datetime(2026, 10, 25, 19, 7, tzinfo=timezone.utc))
+        self.assertEqual(s[0], "Injury-Report_2026-10-25_03_00PM.pdf")
+        self.assertEqual(s[1], "Injury-Report_2026-10-25_02_45PM.pdf")
+
+    def test_registered_and_first_for_injuries(self):
+        from nbalab.sources.router import DEFAULT_PRIORITY
+        self.assertEqual(DEFAULT_PRIORITY["injuries"][0], "NBA_INJURY_REPORT")
