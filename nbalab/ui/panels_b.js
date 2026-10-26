@@ -49,8 +49,10 @@ registerPanel("monitor", "Live Source Monitor", (body) => {
   const host = el("div"); body.append(host);
   async function load() {
     const [src, ev, cf] = await Promise.all([api("/api/sources"), api("/api/events?limit=60"), api("/api/conflicts")]); clear(host);
-    host.append(el("div", {class: "banner warn small"}, `Lab clock: ${src.clock}. No source here is verified live. The bundled demo script is a SIMULATED feed of synthetic reports; it demonstrates the event pipeline, not real-time data.`));
-    host.append(el("div", {class: "row"}, el("button", {class: "primary", onclick: deliver}, "Deliver next demo report"), el("button", {onclick: async () => { await api("/api/demo/reset", {body: {}}); toast("Demo script rewound", true); load(); }}, "Rewind demo script"),
+    const synth = LAB.status && LAB.status.synthetic;
+    host.append(el("div", {class: "banner warn small"}, synth ? `Lab clock: ${src.clock}. No source here is verified live. The bundled demo script is a SIMULATED feed of synthetic reports; it demonstrates the event pipeline, not real-time data.`
+      : `Lab clock: ${src.clock} (real time). A source counts as live only after a successful fetch; enable sources and acknowledge their terms in the Sources panel.`));
+    host.append(el("div", {class: "row"}, synth ? el("button", {class: "primary", onclick: deliver}, "Deliver next demo report") : null, synth ? el("button", {onclick: async () => { await api("/api/demo/reset", {body: {}}); toast("Demo script rewound", true); load(); }}, "Rewind demo script") : null,
       el("button", {onclick: upload}, "Upload events CSV…"), el("button", {onclick: load}, "Refresh")));
     host.append(el("h4", null, "Sources"), dataTable([{key: "name", label: "Source"}, {key: "kind", label: "Type"}, {key: "mode", label: "Mode"}, {key: "freshness_claim", label: "Freshness claim", render: (s) => badge(s.freshness_claim, {verified_live: "b-fresh", simulated: "b-warn", file: "b-info", stale: "b-stale"}[s.freshness_claim] || "")},
       {key: "events_stored", label: "Events", num: true}, {key: "latest_published_age_hours", label: "Latest age (h)", num: true}, {key: "last_error", label: "Last error"}, {key: "terms_status", label: "Terms"}, {key: "notes", label: "Notes", render: (s) => el("span", {class: "small muted", title: s.notes}, (s.notes || "").slice(0, 70))},
@@ -147,3 +149,73 @@ registerPanel("predlab", "Prediction Lab", (body) => {
   }
   return {};
 }, {x: 150, y: 80, w: 760, h: 460});
+
+/* ---------- Data Sources: capability matrix, terms gate, probe, real-data import ---------- */
+registerPanel("sources", "Data Sources & Providers", (body) => {
+  const host = el("div"); body.append(host); let timer = null;
+  const EVID = {probe_verified: ["verified live", "b-pass", "A live request from a real environment returned data (see Probe tab)."], library_catalog: ["in nba_api catalog", "b-info", "Endpoint and columns exist in the nba_api source code. NOT proof it works today."],
+    documented: ["vendor docs", "b-aging", "Stated in the vendor documentation; not yet confirmed by a live request."], unverified: ["unverified", "b-warn", "Inferred; response shape not confirmed."]};
+  const OUT = {ok: "b-pass", empty: "b-warn", skipped: "b-info", not_enabled: "b-info", not_configured: "b-info", blocked: "b-fail", timeout: "b-fail", unreachable: "b-fail", http: "b-fail", auth: "b-warn", parse: "b-fail"};
+  async function load(tab) {
+    const d = await api("/api/datasources"); clear(host);
+    host.append(el("div", {class: "banner small " + (d.synthetic ? "warn" : "")}, `Current dataset: ${d.dataset_label}. Sources are OFF until you enable them and acknowledge their terms. Nothing here buys anything; keys are read from environment variables and never stored.`));
+    const t = tabs([
+      ["matrix", "Capability matrix", () => matrix(d)], ["src", "Sources & terms", () => sources(d)], ["probe", "Probe & log", () => probe(d)], ["imp", "Real-data import", () => importer(d)]], tab || "matrix");
+    host.append(t.root);
+  }
+  function matrix(d) {
+    const w = el("div"); w.append(el("div", {class: "small muted"}, "Rows are research capabilities; chips are the sources that can serve each, in routing priority order. Evidence colours: green = verified by a live probe, blue = endpoint exists in the nba_api catalog, grey = vendor docs only, yellow = unverified."));
+    const rows = d.matrix.map((m) => ({cap: m.capability, desc: m.description, m}));
+    w.append(dataTable([{key: "cap", label: "Capability"}, {key: "desc", label: "What it gives"}, {key: "m", label: "Sources (priority order)", sort: (r) => r.m.sources.length, render: (r) => r.m.sources.length ? el("span", null, r.m.sources.map((c) => {
+      const ev = EVID[c.evidence] || EVID.unverified; const tip = `${c.endpoint}\ntier: ${c.tier}\n${ev[2]}\n${c.notes}${c.probe ? "\nlast probe: " + c.probe.outcome + " " + c.probe.at : ""}`;
+      return el("span", {class: "chip", title: tip, style: {paddingRight: "9px"}}, (c.priority ? c.priority + ". " : "") + c.source + (c.enabled ? "" : " (off)"), " ", badge(ev[0], ev[1]), c.tier.startsWith("paid") || c.tier === "quote" ? badge(c.tier, "b-warn") : null);
+    })) : badge("no source", "b-fail")}], rows, {sortKey: null, pageSize: 60}));
+    const gaps = d.matrix.filter((m) => !m.covered).map((m) => m.capability);
+    if (gaps.length) w.append(el("div", {class: "banner warn small"}, "No source declared for: " + gaps.join(", ")));
+    return w;
+  }
+  function sources(d) {
+    const w = el("div");
+    d.sources.forEach((s) => {
+      const caps = s.capabilities.map((c) => c.capability).join(", ");
+      w.append(el("div", {class: "banner"}, el("div", {class: "row"}, el("b", null, s.name), badge(s.enabled ? "ENABLED" : "off", s.enabled ? "b-pass" : "b-info"), badge("terms: " + s.terms_status, s.terms_status === "restriction_found" ? "b-fail" : s.terms_status === "unreviewed" ? "b-warn" : "b-info"),
+        s.requires_key ? badge(s.configured ? "key present" : "needs " + s.key_env, s.configured ? "b-pass" : "b-warn") : badge("no key", "b-info")),
+        el("div", {class: "small"}, s.terms_summary || "No terms summary recorded."), el("div", {class: "small muted"}, "Terms page: " + (s.terms_url || "n/a")), el("div", {class: "small muted"}, "Capabilities: " + caps),
+        s.ack ? el("div", {class: "small muted"}, `Acknowledged ${s.ack.at}`) : null,
+        el("div", {class: "row"}, s.enabled ? el("button", {class: "danger", onclick: async () => { await api("/api/sources/disable", {body: {name: s.name}}); load("src"); }}, "Disable") : el("button", {class: "primary", onclick: () => enable(s)}, "Enable…"))));
+    });
+    return w;
+  }
+  function enable(s) {
+    const need = `I have read ${s.terms_url} and accept responsibility for how I use this source`; const inp = el("input", {style: {width: "100%"}, placeholder: "type the sentence above exactly"});
+    const m = modal("Enable " + s.name, el("div", null, el("div", {class: "banner warn small"}, s.terms_summary), el("p", null, "To enable this source, read its terms and then type this sentence exactly:"), el("pre", {class: "mono small"}, need), inp,
+      el("div", {class: "row"}, el("button", {class: "primary", onclick: async () => { try { await api("/api/sources/enable", {body: {name: s.name, acknowledgement: inp.value}}); m.remove(); toast(s.name + " enabled", true); load("src"); } catch (e) { toast(e.message); } }}, "Enable source"))));
+  }
+  function probe(d) {
+    const w = el("div"); const prog = el("div"); const out = el("div");
+    w.append(el("div", {class: "small muted"}, "A probe makes a handful of small live requests per ENABLED source and records the honest outcome (ok, empty, blocked, timeout, unreachable, auth, http, parse). stats.nba.com is known to ignore many cloud/hosting IP ranges, so results from a datacenter say little about your home connection; run this on the machine you actually use."),
+      el("div", {class: "row"}, el("button", {class: "primary", onclick: run}, "Run probe on enabled sources"), el("button", {onclick: () => load("probe")}, "Refresh")), prog);
+    async function run() { clear(prog); try { const r = await api("/api/sources/probe", {body: {}}); poll(r.job_id); } catch (e) { toast(e.message); } }
+    function poll(id) { clearInterval(timer); timer = setInterval(async () => { const j = await api("/api/jobs/" + id); clear(prog); prog.append(el("div", {class: "banner small"}, j.state === "running" ? el("span", {class: "spin"}) : "", " " + j.state + (j.error ? ": " + j.error : "")));
+      if (j.state !== "running") { clearInterval(timer); load("probe"); } }, 1500); }
+    w.append(el("h4", null, "Latest probe results"), dataTable([{key: "at", label: "When"}, {key: "source", label: "Source"}, {key: "capability", label: "Capability"}, {key: "outcome", label: "Outcome", render: (r) => badge(r.outcome, OUT[r.outcome] || "")}, {key: "rows", label: "Rows", num: true}, {key: "elapsed_ms", label: "ms", num: true}, {key: "detail", label: "Detail"}], d.probes, {sortKey: "at", desc: true, empty: "No probe has been run yet."}));
+    w.append(el("h4", null, "Request log"), dataTable([{key: "at", label: "When"}, {key: "source", label: "Source"}, {key: "capability", label: "Capability"}, {key: "ok", label: "OK", render: (r) => r.ok ? badge("ok", "b-pass") : badge(r.error_kind, "b-fail")}, {key: "rows", label: "Rows", num: true}, {key: "detail", label: "Detail"}], d.log, {sortKey: "at", desc: true, empty: "No requests yet."}));
+    return w;
+  }
+  function importer(d) {
+    const w = el("div"); const seasons = el("input", {value: "", placeholder: "e.g. 2025-26,2026-27 (blank = current season)", style: {width: "260px"}}); const prog = el("div"); const dbs = el("div");
+    w.append(el("div", {class: "banner warn small"}, "Imports players, schedule and player game logs (including minutes) through the enabled sources into a SEPARATE database, so synthetic and real data are never mixed. Tracking columns are stored as missing, starters are INFERRED from minutes until a box-score backfill exists, and coaches are unknown. Review the source terms (Sources tab) before importing."),
+      el("div", {class: "row"}, "Seasons", seasons, el("button", {class: "primary", onclick: go}, "Import into new database")), prog, el("h4", null, "Databases"), dbs);
+    async function go() { clear(prog); const list = seasons.value.split(",").map((x) => x.trim()).filter(Boolean);
+      try { const r = await api("/api/data/import", {body: {seasons: list.length ? list : undefined, overwrite: true}}); poll(r.job_id); } catch (e) { toast(e.message); } }
+    function poll(id) { clearInterval(timer); timer = setInterval(async () => { const j = await api("/api/jobs/" + id); clear(prog);
+      prog.append(el("div", {class: "banner small " + (j.state === "error" ? "bad" : "")}, j.state === "running" ? el("span", {class: "spin"}) : "", " " + j.state + " · " + (j.error || (j.progress || []).slice(-2).join(" | "))));
+      if (j.state !== "running") { clearInterval(timer); listDbs(); if (j.state === "done") toast(`Imported ${j.result.games} games, ${j.result.box_rows} player-game rows`, true); } }, 1500); }
+    async function listDbs() { const r = await api("/api/data/databases"); clear(dbs);
+      dbs.append(dataTable([{key: "name", label: "File"}, {key: "label", label: "Dataset label"}, {key: "size_mb", label: "MB", num: true}, {key: "cur", label: "", render: (x) => x.path === r.current ? badge("in use", "b-pass") :
+        el("button", {onclick: async () => { try { await api("/api/data/switch", {body: {path: x.path}}); toast("Switched. Reloading…", true); setTimeout(() => location.reload(), 800); } catch (e) { toast(e.message); } }}, "Switch to this")}], r.databases, {sortKey: null})); }
+    listDbs(); return w;
+  }
+  load().catch((e) => host.append(el("div", {class: "banner bad"}, e.message)));
+  return {close: () => clearInterval(timer), reload: () => load()};
+}, {x: 60, y: 30, w: 1040, h: 620});

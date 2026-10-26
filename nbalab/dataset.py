@@ -61,9 +61,9 @@ def build(store: Store) -> Dataset:
     pg["game_id"] = np.fromiter((r["game_id"] for r in rows), dtype=np.int64, count=n)
     pg["player_id"] = np.fromiter((r["player_id"] for r in rows), dtype=np.int64, count=n)
     pg["team_id"] = np.fromiter((r["team_id"] for r in rows), dtype=np.int64, count=n)
-    pg["started"] = np.fromiter((r["started"] for r in rows), dtype=np.int64, count=n)
+    pg["started"] = np.fromiter((0 if r["started"] is None else r["started"] for r in rows), dtype=np.int64, count=n)
     for c in BOX_COLS:
-        pg[c] = np.fromiter((r[c] for r in rows), dtype=float, count=n)
+        pg[c] = np.fromiter((np.nan if r[c] is None else r[c] for r in rows), dtype=float, count=n)
 
     g_arr = pg["game_id"]
     ginfo = games

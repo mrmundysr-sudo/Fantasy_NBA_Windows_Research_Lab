@@ -17,7 +17,7 @@ def main(shots=None):
             if shots: pg.screenshot(path=os.path.join(shots, n + ".png"))
         shot("picks")
         pg.click("#desk table tbody tr"); pg.wait_for_timeout(500); shot("picks_detail")
-        for pid in ["workbench", "research", "monitor", "models", "audit", "predlab"]:
+        for pid in ["workbench", "research", "monitor", "models", "audit", "predlab", "sources"]:
             pg.click(f'#launchers button[data-id="{pid}"]'); pg.wait_for_timeout(700)
         pg.click("#tile"); pg.wait_for_timeout(300)
         pg.click("#wb-run"); pg.wait_for_selector(".panel:has-text('Workbench') table.t tbody tr", timeout=60000); shot("workbench")
@@ -27,6 +27,9 @@ def main(shots=None):
         pg.click(".panel:has-text('Natural-Language') button.primary >> text=Ask"); pg.wait_for_selector("text=Query Inspector", timeout=60000); shot("nlq")
         pg.click(".panel:has-text('Live Source Monitor') button:has-text('Deliver next demo report')"); pg.wait_for_timeout(8000); shot("monitor")
         pg.click(".panel:has-text('Audit') button:has-text('Run deep audit')"); pg.wait_for_selector(".panel:has-text('Audit') >> text=Leakage", timeout=90000); shot("audit")
+        pg.click("#tile"); pg.wait_for_timeout(300)
+        pg.click(".panel:has-text('Data Sources') .tabs button:has-text('Sources & terms')"); pg.wait_for_selector("text=terms: restriction_found", timeout=20000); shot("sources")
+        pg.click(".panel:has-text('Data Sources') .tabs button:has-text('Capability matrix')"); pg.wait_for_selector("text=lineup_combinations", timeout=20000)
         pg.fill("#gsearch", "a"); pg.wait_for_timeout(800); pg.click("#tile"); pg.wait_for_timeout(300); shot("tiled")
         b.close()
     app.stop()

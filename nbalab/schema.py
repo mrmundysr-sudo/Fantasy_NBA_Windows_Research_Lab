@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS scoring_systems (scoring_id TEXT, version INTEGER, na
     PRIMARY KEY (scoring_id, version));
 CREATE TABLE IF NOT EXISTS model_registry (seq INTEGER PRIMARY KEY AUTOINCREMENT, model_id TEXT, version TEXT, action TEXT,
     at TEXT, metrics_json TEXT, note TEXT);
+CREATE TABLE IF NOT EXISTS source_log (log_id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, source TEXT, capability TEXT, ok INTEGER,
+    error_kind TEXT, detail TEXT, rows INTEGER, elapsed_ms REAL, url TEXT);
+CREATE TABLE IF NOT EXISTS source_probe (probe_id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, source TEXT, capability TEXT, outcome TEXT,
+    rows INTEGER, elapsed_ms REAL, url TEXT, detail TEXT, sample_json TEXT, env TEXT);
+CREATE TABLE IF NOT EXISTS id_map (source TEXT, source_id TEXT, entity TEXT, lab_id INTEGER, name TEXT, PRIMARY KEY (source, entity, source_id));
 CREATE TABLE IF NOT EXISTS workspaces (name TEXT PRIMARY KEY, spec_json TEXT, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS synthetic_truth (player_id INTEGER PRIMARY KEY, params_json TEXT);
 CREATE INDEX IF NOT EXISTS ix_box_player ON box(player_id);

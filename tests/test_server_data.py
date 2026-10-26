@@ -116,3 +116,79 @@ class Synthetic(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DataSourcesApi(unittest.TestCase):
+    """End to end through HTTP with recorded (shape-fixture) transports: enable gate -> import job -> switch database."""
+
+    def test_enable_import_switch_flow(self):
+        import time
+        from nbalab.lab import Lab
+        from nbalab.sources.transport import RecordedTransport
+        from tests.test_sources import routes
+        tmp = tempfile.mkdtemp()
+        old = os.environ.get("LOCALAPPDATA")
+        os.environ["LOCALAPPDATA"] = tmp
+        try:
+            os.makedirs(os.path.join(tmp, "NBALab"), exist_ok=True)
+            lab = Lab.open(os.path.join(tmp, "NBALab", "synthetic.sqlite"), n_draws=20)
+            for s in lab.sources.sources.values():
+                s.transport = RecordedTransport(routes())
+            app = App(lab); app.start()
+            base = f"http://127.0.0.1:{app.port}"
+
+            def call(path, body=None, method=None):
+                req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers={"X-Lab-Token": app.token, "Content-Type": "application/json"}, method=method)
+                try:
+                    with urllib.request.urlopen(req, timeout=60) as r:
+                        return r.status, json.loads(r.read())
+                except urllib.error.HTTPError as e:
+                    return e.code, json.loads(e.read())
+            c, d = call("/api/datasources")
+            self.assertEqual(c, 200)
+            self.assertTrue(all(not s["enabled"] for s in d["sources"]))
+            self.assertTrue(any(m["capability"] == "lineup_combinations" and m["covered"] for m in d["matrix"]))
+            c, _ = call("/api/sources/enable", {"name": "NBA_STATS", "acknowledgement": "yes"})
+            self.assertEqual(c, 400)
+            # import is refused while the source is disabled
+            c, j = call("/api/data/import", {"seasons": ["2026-27"]})
+            jid = j["job_id"]
+            for _ in range(100):
+                c, st = call("/api/jobs/" + jid)
+                if st["state"] != "running":
+                    break
+                time.sleep(0.1)
+            self.assertEqual(st["state"], "error")
+            self.assertIn("not_enabled", st["error"])
+            # enable properly, import, switch
+            s = [x for x in d["sources"] if x["name"] == "NBA_STATS"][0]
+            c, _ = call("/api/sources/enable", {"name": "NBA_STATS", "acknowledgement": f"I have read {s['terms_url']} and accept responsibility for how I use this source"})
+            self.assertEqual(c, 200)
+            c, j = call("/api/data/import", {"seasons": ["2026-27"], "overwrite": True})
+            for _ in range(200):
+                c, st = call("/api/jobs/" + j["job_id"])
+                if st["state"] != "running":
+                    break
+                time.sleep(0.1)
+            self.assertEqual(st["state"], "done", st)
+            self.assertGreater(st["result"]["box_rows"], 100)
+            c, dbs = call("/api/data/databases")
+            real = [x for x in dbs["databases"] if x["label"] == "NBA_STATS_IMPORT"]
+            self.assertEqual(len(real), 1)
+            c, _ = call("/api/data/switch", {"path": "/etc/passwd"})
+            self.assertEqual(c, 400)
+            c, _ = call("/api/data/switch", {"path": real[0]["path"]})
+            self.assertEqual(c, 200)
+            c, stt = call("/api/status")
+            self.assertFalse(stt["synthetic"])
+            self.assertEqual(stt["dataset_label"], "NBA_STATS_IMPORT")
+            c, w = call("/api/workbench", {"query": {"entity": "player", "metrics": [{"id": "pts", "transform": "per36"}], "min_games": 1, "min_minutes": 0, "limit": 3, "uncertainty": False}})
+            self.assertEqual(w["meta"]["dataset_label"], "NBA_STATS_IMPORT")
+            c, r = call("/api/demo/deliver", {})
+            self.assertEqual(c, 400)                          # scripted demo feed never runs beside real data
+            app.stop()
+        finally:
+            if old is None:
+                os.environ.pop("LOCALAPPDATA", None)
+            else:
+                os.environ["LOCALAPPDATA"] = old

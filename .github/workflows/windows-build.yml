@@ -4,6 +4,11 @@ on:
     branches: [dev/**]
   pull_request:
   workflow_dispatch:
+    inputs:
+      probe_sources:
+        description: 'Run the live provider probe (makes a few small requests per source)'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -57,3 +62,24 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install numpy pytest
       - run: python -m pytest -q tests
+  provider-probe:
+    # Manual only: makes live requests to NBA.com and vendors. GitHub-hosted runners are cloud IPs, which stats.nba.com is reported
+    # to ignore (see docs/DATA_PROVIDER_EVALUATION.md), so a failure here does not prove the endpoint fails on a home connection.
+    if: github.event_name == 'workflow_dispatch' && inputs.probe_sources
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - name: Probe NBA stats and live feeds
+        run: python tools/probe_sources.py --acknowledge-terms --sources NBA_STATS NBA_LIVE --out probe_report.json --save-samples probe_samples
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: provider-probe
+          path: |
+            probe_report.json
+            probe_samples

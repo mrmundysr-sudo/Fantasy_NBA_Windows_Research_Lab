@@ -18,6 +18,8 @@ from .models import FeatureCache, LabModel
 from .nlq import NLQ
 from .projector import Projector
 from .providers.adapters import CsvEventProvider, DemoScriptProvider, HttpJsonProvider
+from .sources import SourceRouter
+from .sources.events_bridge import SourceEventAdapter
 from .scoring import ScoringRegistry
 from .store import Store, default_data_dir, utcnow
 
@@ -54,11 +56,16 @@ class Lab:
         self.events = EventManager(s, self.ds, self.fb, self.clock, on_new_events=self._on_events)
         self.projector = Projector(s, self.ds, self.fb, self.cache, self.champion_model, self.events, self.clock)
         self.demo = DemoScriptProvider(self.ds, s, self.fb)
-        self.events.register(self.demo)
+        if self.ds.synthetic:                       # the scripted demo feed only ever exists beside synthetic data
+            self.events.register(self.demo)
         self.csv_provider = CsvEventProvider(None)
         self.events.register(self.csv_provider)
-        for name in ("NBA_OFFICIAL_INJURY_REPORT", "SPORTSDATAIO", "SPORTRADAR"):
-            self.events.register(HttpJsonProvider(name))
+        self.sources = SourceRouter(s)
+        for src, cap in (("NBA_LIVE", "injuries"), ("NBA_LIVE", "starting_lineups"), ("SPORTSDATAIO", "injuries"), ("SPORTSDATAIO", "starting_lineups"),
+                         ("BALLDONTLIE", "injuries"), ("BALLDONTLIE", "starting_lineups")):
+            self.events.register(SourceEventAdapter(self.sources, src, cap))
+        self.events.register(HttpJsonProvider("NBA_OFFICIAL_INJURY_REPORT"))   # placeholder: the official report is a PDF; no parser yet
+        self.events.register(HttpJsonProvider("SPORTRADAR"))
         self.engine.projections = self.projector.projections_for_engine(self.scoring.get("classic_points")["rules"])
         self.trained_through: Optional[str] = None
 
@@ -110,11 +117,15 @@ class Lab:
 
     def deliver_demo_report(self) -> dict:
         """Deliver the next scripted SYNTHETIC injury/lineup report and recompute affected projections."""
+        if not self.ds.synthetic:
+            raise ValueError("the scripted demo feed exists only with the SYNTHETIC fixture")
         self.ensure_projections()
         res = self.events.poll("DEMO_SCRIPT", recompute=True)
         return res
 
     def reset_demo(self) -> None:
+        if not self.ds.synthetic:
+            raise ValueError("the scripted demo feed exists only with the SYNTHETIC fixture")
         self.demo.reset()
 
     # ---------------------------------------------------------------------------------------------
@@ -166,5 +177,6 @@ class Lab:
             "games_scheduled": len(ds.games) - len(finals), "player_game_rows": int(len(ds.pg["game_id"])), "seasons": ds.seasons,
             "last_game_date": max(g["game_date"] for g in finals), "lab_clock": self.clock(), "metrics_registered": len(__import__("nbalab.registry", fromlist=["x"]).all_metrics()),
             "champion": self.registry.champion(), "trained_through": self.trained_through, "projections_stored": self.store.one("SELECT COUNT(*) c FROM predictions")["c"],
-            "events_stored": self.store.one("SELECT COUNT(*) c FROM events")["c"],
+            "events_stored": self.store.one("SELECT COUNT(*) c FROM events")["c"], "import_info": self.store.get_meta("import_info"),
+            "db_path": getattr(self.store, "path", None),
         }

@@ -27,7 +27,8 @@ from . import __version__, audit, explorer, registry
 from .engine import QueryError
 from .lab import Lab
 from .providers.adapters import CsvEventProvider
-from .store import utcnow
+from .sources.base import SourceError
+from .store import default_data_dir, utcnow
 
 
 def ui_dir() -> str:
@@ -62,6 +63,26 @@ def clean(o: Any):
 MIME = {".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json"}
 
 
+def data_databases():
+    """SQLite lab databases in the data directory with their dataset label (read-only peek)."""
+    import sqlite3
+    out = []
+    d = default_data_dir()
+    for f in sorted(os.listdir(d)):
+        if f.endswith(".sqlite"):
+            p = os.path.join(d, f)
+            label = None
+            try:
+                c = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+                r = c.execute("SELECT value FROM meta WHERE key='data_label'").fetchone()
+                label = json.loads(r[0]) if r else None
+                c.close()
+            except Exception:
+                pass
+            out.append({"path": p, "name": f, "label": label, "size_mb": round(os.path.getsize(p) / 1e6, 1)})
+    return out
+
+
 class App:
     def __init__(self, lab: Lab, port: int = 0, token: Optional[str] = None):
         self.lab = lab
@@ -73,6 +94,33 @@ class App:
     @property
     def url(self) -> str:
         return f"http://127.0.0.1:{self.port}/?t={self.token}"
+
+
+    def start_job(self, kind: str, fn) -> str:
+        """Run fn(say) in a thread; state/progress/result/error are readable at /api/jobs/<id>."""
+        import time as _t
+        lab = self.lab
+        jid = f"{kind}-{int(_t.time() * 1000)}"
+        job = {"id": jid, "kind": kind, "state": "running", "progress": [], "result": None, "error": None}
+        lab.jobs[jid] = job
+
+        def run():
+            try:
+                job["result"] = fn(lambda m: job["progress"].append(m))
+                job["state"] = "done"
+            except Exception as e:  # noqa: BLE001 - surfaced to the UI, never crash the server
+                job["error"] = f"{type(e).__name__}: {e}"
+                job["state"] = "error"
+        threading.Thread(target=run, daemon=True).start()
+        return jid
+
+    def swap_lab(self, lab) -> None:
+        old = self.lab
+        self.lab = lab
+        try:
+            old.store.close()
+        except Exception:
+            pass
 
     def start(self) -> None:
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
@@ -145,6 +193,8 @@ class App:
                     self._json(code, out)
                 except QueryError as e:
                     self._json(400, {"error": str(e), "kind": type(e).__name__})
+                except SourceError as e:
+                    self._json(400, {"error": str(e), "kind": e.kind})
                 except KeyError as e:
                     self._json(404, {"error": f"not found: {e}"})
                 except (ValueError, json.JSONDecodeError) as e:
@@ -227,12 +277,60 @@ class App:
             if path == "/api/workspaces":
                 rows = lab.store.query("SELECT name, spec_json, updated_at FROM workspaces ORDER BY name")
                 return 200, {"workspaces": [{"name": r["name"], "spec": json.loads(r["spec_json"]), "updated_at": r["updated_at"]} for r in rows]}
+            if path == "/api/datasources":
+                return 200, {"sources": [x.describe() for x in lab.sources.sources.values()], "matrix": lab.sources.matrix(), "priority": lab.sources.priority,
+                             "log": [dict(r) for r in lab.store.query("SELECT * FROM source_log ORDER BY log_id DESC LIMIT 40")],
+                             "probes": [dict(r) for r in lab.store.query("SELECT probe_id, at, source, capability, outcome, rows, elapsed_ms, detail FROM source_probe ORDER BY probe_id DESC LIMIT 80")],
+                             "dataset_label": lab.ds.label(), "synthetic": lab.ds.synthetic}
+            if path.startswith("/api/jobs/"):
+                job = lab.jobs.get(path.rsplit("/", 1)[1])
+                if not job:
+                    raise KeyError("job")
+                return 200, {k: v for k, v in job.items()}
+            if path == "/api/data/databases":
+                return 200, {"databases": data_databases(), "current": getattr(lab.store, "path", None)}
             if path == "/api/nlq/examples":
                 from .nlq import EXAMPLES
                 a, b = list(lab.ds.players.values())[12]["name"], list(lab.ds.players.values())[108]["name"]
                 return 200, {"examples": [e.replace("<player A>", a).replace("<player B>", b).replace("<player>", a).replace("<teammate>", b) for e in EXAMPLES]}
             return 404, {"error": "unknown route"}
         if method == "POST":
+            if path == "/api/sources/enable":
+                return 200, lab.sources.enable(body["name"], body.get("acknowledgement", ""))
+            if path == "/api/sources/disable":
+                return 200, lab.sources.disable(body["name"])
+            if path == "/api/sources/priority":
+                lab.sources.set_priority(body["capability"], body["order"])
+                return 200, {"priority": lab.sources.priority[body["capability"]]}
+            if path == "/api/sources/probe":
+                names = body.get("names")
+                save = os.path.join(os.path.dirname(os.path.abspath(lab.store.path)), "probe_samples") if lab.store.path != ":memory:" else None
+                return 200, {"job_id": self.start_job("probe", lambda say: lab.sources.probe(names, save_dir=save))}
+            if path == "/api/data/import":
+                seasons = body.get("seasons") or [__import__("nbalab.sources", fromlist=["x"]).current_season()]
+                target = body.get("path") or os.path.join(default_data_dir(), "nba_real.sqlite")
+
+                def job(say):
+                    from .store import Store
+                    from .sources.importer import import_real
+                    if os.path.exists(target) and not body.get("overwrite"):
+                        raise ValueError(f"{target} already exists (pass overwrite=true to replace it)")
+                    if os.path.exists(target):
+                        os.remove(target)
+                    st = Store(target)
+                    try:
+                        out = import_real(lab.sources, st, seasons, progress=say)
+                    finally:
+                        st.close()
+                    out["path"] = target
+                    return out
+                return 200, {"job_id": self.start_job("import", job)}
+            if path == "/api/data/switch":
+                target = body["path"]
+                if target not in [d["path"] for d in data_databases()]:
+                    raise ValueError("unknown database (must be one of /api/data/databases)")
+                self.swap_lab(Lab.open(target))
+                return 200, {"switched": target}
             if path == "/api/workbench":
                 return 200, lab.engine.run(body["query"])
             if path == "/api/support":
