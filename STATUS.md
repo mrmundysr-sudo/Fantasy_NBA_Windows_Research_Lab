@@ -46,6 +46,8 @@ A working, launchable, offline-first Windows research workstation exists: a Pyth
 * One Windows UI-smoke failure occurred on a manual re-run of a commit whose push run passed (flaky); local smoke passes. Watch for recurrence.
 * See `docs/DATA_PROVIDER_EVALUATION.md` and `docs/LICENSING_AND_COMMERCIAL_CONCERNS.md`. The NBA.com terms question (Section 9) is an open owner decision.
 
+* **Data Source Diagnostics** (new): standalone `NBA-Source-Diagnostics.exe` (one file, windowed, no admin) plus a Lab panel, sharing `nbalab/diagnostics.py`. Terms are confirmed in the page before any request. Built and attached to the private release `diagnostics-latest` by the `diagnostics-exe` CI job. The page is tested headlessly against recorded fixtures; **a human double-click on a real Windows desktop has not been observed yet**.
+
 ## Windows verification
 Verified on a GitHub Actions `windows-latest` runner (run 40247859624, commit c737f1f, branch `dev/windows-research-lab`). Passed there: the full test suite (pytest), the headless-Chromium UI smoke test, the PyInstaller build, and `NBALab.exe --selftest` on the packaged app (serves the UI, token check, workbench query, picks projection). Earlier runs failed on two real packaging bugs (relative-import entry point; UI data folder shadowing the package), both fixed.
 **Not verified:** nobody has yet launched the desktop window (pywebview/WebView2) on a real Windows desktop, so the visible window, SmartScreen behaviour and layout on real displays are untested. CI only exercises the headless server/browser path.

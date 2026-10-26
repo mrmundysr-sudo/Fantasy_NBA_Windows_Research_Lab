@@ -29,6 +29,15 @@ Opening takes a few seconds while the synthetic fixture is generated, models are
 ## Secrets
 No API keys are required or included. If provider adapters are enabled later, keys come from environment variables and must never be committed (`.gitignore` already excludes `.env`, `*.key`, `secrets.*`, `*.sqlite`).
 
+## One-click source test (no Python, no terminal)
+
+1. On GitHub open the repository, then **Releases**, then **NBA Source Diagnostics (latest dev build)** (it is private; you need to be signed in).
+2. Download `NBA-Source-Diagnostics.exe` and double-click it. No installer, no administrator rights. Windows may show a SmartScreen notice because the file is not code-signed: choose *More info*, then *Run anyway*.
+3. Your browser opens a local page (it only listens on your own computer). Read each source's terms link, tick the confirmation, press **Run Tests**.
+4. Press **Export Report**. It saves `probe_report.json` in your Downloads folder. Send me that file.
+
+The same tool is inside the Lab as the **Diagnostics** panel and works for any provider added to the source layer.
+
 ## Real data (optional, your own machine)
 
 1. Open the Sources panel, read each provider's terms link, and enable only what you accept.
